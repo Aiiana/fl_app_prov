@@ -1,9 +1,6 @@
-import 'package:dio/dio.dart';
-
 import 'package:flutter/material.dart';
-
+import 'package:pr_app_weather/get_weather_provider.dart';
 import 'package:pr_app_weather/theme_app.dart';
-import 'package:pr_app_weather/weather_model.dart';
 import 'package:provider/provider.dart';
 
 void main() {
@@ -15,22 +12,24 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-     return MultiProvider(
+    return MultiProvider(
       providers: [
         ChangeNotifierProvider(
           create: (context) => ThemeProvider(),
         ),
-        
+        ChangeNotifierProvider(
+          create: (context) => GetWeatherProvider(),
+        ),
       ],
-    child:MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        colorScheme:
-            ColorScheme.fromSwatch().copyWith(secondary: Colors.deepPurple),
-        useMaterial3: true,
+      child: MaterialApp(
+        title: 'Flutter Demo',
+        theme: ThemeData(
+          colorScheme:
+              ColorScheme.fromSwatch().copyWith(secondary: Colors.deepPurple),
+          useMaterial3: true,
+        ),
+        home: const MyHomePage(),
       ),
-      home: const MyHomePage(),
-    ),
     );
   }
 }
@@ -43,85 +42,84 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  String image = "";
-  String temp = "";
-  String city = "";
-  String state = "";
- 
-  Future<void> getData() async {
-    Dio dio = Dio();
-    Response response = await dio.get(
-      "https://api.openweathermap.org/data/2.5/weather",
-      queryParameters: {
-        "lat": 42.882004,
-        "lon": 74.582748,
-        "appid": "99e8a0fe0e835bd24d899cd8d3a93d2e",
-        "units": "metric",
-        "lang": "ru",
-      },
-    );
-
-    final model = WeatherModel.fromJson(response.data);
-    
-    
-    image = model.weather?.first.icon ?? "";
-    temp = model.name ?? "";
-    city = model.main?.temp.toString() ?? "";
-   
-
-    setState(() {});
-  }
-
   @override
   void initState() {
-    getData();
+    context.read<GetWeatherProvider>().getWeather();
     super.initState();
   }
 
   @override
   Widget build(BuildContext context) {
+    final getWeatherProvider = context.watch<GetWeatherProvider>();
+
+    final TextEditingController controller = TextEditingController();
     return Scaffold(
-       backgroundColor: context.watch<ThemeProvider>().getBgColor,
+      backgroundColor: context.watch<ThemeProvider>().getBgColor,
       appBar: AppBar(
-           backgroundColor: context.watch<ThemeProvider>().getAbColor,
-        title:  Center(child: Padding(
-          padding: EdgeInsets.only(right: 50),
-          child: Text("Bishkek",
-          
-          style: TextStyle(
-           color:context.watch<ThemeProvider>().getTextColor,
-            fontSize: 25,
-            fontWeight: FontWeight.bold
-          ),),
-        )),
+        backgroundColor: context.watch<ThemeProvider>().getAbColor,
+        title: Center(
+          child: Padding(
+            padding: const EdgeInsets.only(right: 50),
+            child: TextField(
+              controller: controller,
+              decoration: InputDecoration(
+                suffixIcon: IconButton(
+                  icon: const Icon(
+                    Icons.search_rounded,
+                    color: Colors.white,
+                  ),
+                  onPressed: () {
+                    getWeatherProvider.getWeather(
+                      cityName: controller.text,
+                    );
+                  },
+                ),
+                hintText: getWeatherProvider.model.name,
+                hintStyle: TextStyle(
+                  color: context.watch<ThemeProvider>().getTextColor,
+                  fontSize: 25,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              style: TextStyle(
+                  color: context.watch<ThemeProvider>().getTextColor,
+                  fontSize: 25,
+                  fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
         leading: IconButton(
-            onPressed: () {
-              context.read<ThemeProvider>().changeTheme();
-            },
-            icon: context.watch<ThemeProvider>().getAbIcon,
-            ),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(state),
-            Image.network(
-              "https://openweathermap.org/img/wn/$image@2x.png",
-              errorBuilder: (context, error, stackTrace) => Icon(Icons.error),
-            ),
-            Text(
-              city,
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-            Text(
-              temp,
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-            
-          ],
+          onPressed: () {
+            context.read<ThemeProvider>().changeTheme();
+          },
+          icon: context.watch<ThemeProvider>().getAbIcon,
         ),
       ),
+      body: getWeatherProvider.isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(getWeatherProvider.model.main?.temp.toString() ?? ''),
+                  Image.network(
+                    "https://openweathermap.org/img/wn/${getWeatherProvider.model.weather?.first.icon}@2x.png",
+                    errorBuilder: (context, error, stackTrace) =>
+                        const Icon(Icons.error),
+                  ),
+                  Text(
+                    getWeatherProvider.model.weather?.first.description
+                            ?.toString() ??
+                        '',
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                  Text(
+                    getWeatherProvider.model.main?.feelsLike.toString() ?? '',
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                ],
+              ),
+            ),
     );
   }
 }
